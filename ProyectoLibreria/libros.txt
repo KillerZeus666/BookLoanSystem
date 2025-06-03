@@ -1,6 +1,6 @@
 Cálculo Diferencial,120,2
 1,1,06-06-2025
-2,0,08-01-2023
+2,0,10-06-2025
 Álgebra Lineal,111,1
 1,1,06-06-2025
 Historia de Colombia,223,3

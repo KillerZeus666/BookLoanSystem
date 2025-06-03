@@ -92,7 +92,7 @@ void trim(char* str) {
     *(end + 1) = '\0';
 }
 
-// ================= MODO MANUAL ================= //
+// ================= MODO MANUAL/AUTOMATICO ================= //
 
 void modo_manual(const char* archivo) {
     FILE *fp = fopen(archivo, "r");
@@ -107,14 +107,41 @@ void modo_manual(const char* archivo) {
         exit(1);
     }
 
-    char operacion[2], libro[100];
-    int isbn;
-    while (fscanf(fp, "%1s,%99[^,],%d", operacion, libro, &isbn) != EOF) {
-        if (strcmp(operacion, "Q") == 0) break;
-        enviar_solicitud(pipe_fd, operacion, libro, isbn);
-        printf("📨 Enviando: %s %s %d\n", operacion, libro, isbn);
+    char linea[256];
+    while (fgets(linea, sizeof(linea), fp)) {
+        // Eliminar salto de línea final
+        linea[strcspn(linea, "\n")] = '\0';
+
+        char operacion[2], libro[100];
+        int isbn, ejemplar = -1;
+        int num_campos = sscanf(linea, "%1[^,],%99[^,],%d,%d", operacion, libro, &isbn, &ejemplar);
+
+        if (num_campos < 3) {
+            printf("⚠️ Formato de línea inválido: %s\n", linea);
+            continue;
+        }
+
+        // Construir mensaje según el número de campos encontrados
+        char mensaje[256];
+        if (num_campos == 4) {
+            snprintf(mensaje, sizeof(mensaje), "%s,%s,%d,%d", operacion, libro, isbn, ejemplar);
+        } else if (num_campos == 3) {
+            snprintf(mensaje, sizeof(mensaje), "%s,%s,%d", operacion, libro, isbn);
+        } else {
+            printf("⚠️ Línea no válida: %s\n", linea);
+            continue;
+        }
+
+        // Enviar al receptor
+        write(pipe_fd, mensaje, strlen(mensaje) + 1);
+        printf("📨 Enviando: %s\n", mensaje);
         sleep(1);
     }
+
+    // Al finalizar, enviar solicitud de parada
+    char mensaje_salida[] = "Q,Salir,0";
+    write(pipe_fd, mensaje_salida, strlen(mensaje_salida) + 1);
+    printf("📨 Enviando solicitud de parada: %s\n", mensaje_salida);
 
     close(pipe_fd);
     fclose(fp);
@@ -193,7 +220,7 @@ int main() {
     cargarLibrosDesdeArchivo();
 
     int modo;
-    printf("\n📌 Seleccione modo:\n1. Manual\n2. Interactivo\nOpción: ");
+    printf("\n📌 Seleccione modo:\n1. Automatico\n2. Interactivo\nOpción: ");
     scanf("%d", &modo);
     getchar();
 
